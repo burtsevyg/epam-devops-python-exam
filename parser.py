@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+
+import sys, getopt
+
 import datetime
 from collections import OrderedDict
 
@@ -37,30 +41,42 @@ from botocore.client import ClientError
 #
 # for bucket in s3.buckets.all():
 #     print(bucket.name)
-
-link='https://ya.ru'
-
-r = requests.get(link)
-
-soup = BeautifulSoup(r.text, 'html.parser')
-
-stats={}
-
-raw = [tag.name for tag in soup.find_all()]
-
-for key in raw:
-    if key in stats:
-        stats[key] = stats[key] + 1
-    else:
-        stats[key] = 1
-
-sum_tags = str(len(raw))
-
-sorted_stats_str=', '.join('\'' + tpl[0] + '\':' + str(tpl[1]) for tpl in sorted(stats.items(),key=lambda item: item[1], reverse=True))
-
-timestamp = datetime.datetime.now().strftime("%Y/%W/%m/%d %H:%M")
-
-print(timestamp + " " + link + " " + sum_tags + " {" + sorted_stats_str + "}")
+from requests.exceptions import MissingSchema, RequestException
 
 
+def main(argv):
+    try:
+        link=sys.argv[1]
+    except IndexError:
+        print ('parser.py <url>')
+        sys.exit(2)
+
+    try:
+        r = requests.get(link)
+    except RequestException:
+        print("Not valid url")
+        sys.exit(3)
+
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    stats={}
+
+    raw = [tag.name for tag in soup.find_all()]
+
+    for key in raw:
+        if key in stats:
+            stats[key] = stats[key] + 1
+        else:
+            stats[key] = 1
+
+    sum_tags = str(len(raw))
+
+    sorted_stats_str=', '.join('\'' + tpl[0] + '\':' + str(tpl[1]) for tpl in sorted(stats.items(),key=lambda item: item[1], reverse=True))
+
+    timestamp = datetime.datetime.now().strftime("%Y/%W/%m/%d %H:%M")
+
+    print(timestamp + " " + link + " " + sum_tags + " {" + sorted_stats_str + "}")
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
 
