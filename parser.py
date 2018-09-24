@@ -1,3 +1,6 @@
+import datetime
+from collections import OrderedDict
+
 import boto3
 import requests
 from bs4 import BeautifulSoup
@@ -35,7 +38,9 @@ from botocore.client import ClientError
 # for bucket in s3.buckets.all():
 #     print(bucket.name)
 
-r = requests.get('https://ya.ru')
+link='https://ya.ru'
+
+r = requests.get(link)
 
 soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -49,6 +54,13 @@ for key in raw:
     else:
         stats[key] = 1
 
-sum_tags = len(raw)
-print(sum_tags)
-print(sorted(stats.keys()))
+sum_tags = str(len(raw))
+
+sorted_stats_str=', '.join('\'' + tpl[0] + '\':' + str(tpl[1]) for tpl in sorted(stats.items(),key=lambda item: item[1], reverse=True))
+
+timestamp = datetime.datetime.now().strftime("%Y/%W/%m/%d %H:%M")
+
+print(timestamp + " " + link + " " + sum_tags + " {" + sorted_stats_str + "}")
+
+
+
