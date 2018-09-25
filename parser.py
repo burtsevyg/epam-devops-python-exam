@@ -1,26 +1,28 @@
 #!/usr/bin/python3
 
-import sys
-import logging
-
 import datetime
-from collections import OrderedDict
+import logging
+import os
+import sys
 
 import boto3
 import requests
-from bs4 import BeautifulSoup
 from botocore.client import ClientError
+from bs4 import BeautifulSoup
+from requests.exceptions import RequestException
 
-logging.basicConfig(filename='parse.log',level=logging.INFO)
-
-from requests.exceptions import MissingSchema, RequestException
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.FileHandler('parse.log'))
+logger.setLevel(logging.INFO)
 
 
 def parse(url):
+    aws_bucket= "burtsev-log"
+
     try:
         r = requests.get(url)
     except RequestException:
-        logging.critical("Not valid url")
+        logger.critical("Not valid url")
         sys.exit(3)
 
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -41,46 +43,33 @@ def parse(url):
 
     timestamp = datetime.datetime.now().strftime("%Y/%W/%m/%d %H:%M")
 
-    logging.info(timestamp + " " + url + " " + sum_tags + " {" + sorted_stats_str + "}")
+    logger.info(timestamp + " " + url + " " + sum_tags + " {" + sorted_stats_str + "}")
+
+    upload_to_s3(aws_bucket)
 
 def upload_to_s3(bucket_name):
-    to_bucket_name = "burtsevyg-logs"
-    from_bucket_list_names = ["from-bucket-1", "from-bucket-2"]
     s3 = boto3.resource('s3')
 
     try:
-        to_bucket = s3.meta.client.head_bucket(Bucket=to_bucket_name)
+        s3.meta.client.head_bucket(Bucket=bucket_name)
     except ClientError:
-        print("The bucket does not exist or you have no access.")
-        print("Trying to create bucket.")
-        to_bucket_obj = s3.create_bucket(
-            Bucket=to_bucket_name,
-    CreateBucketConfiguration={
+        logger.warning('The bucket does not exist or you have no access.')
+        logger.warning('Trying to create bucket.')
+        s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
                 'LocationConstraint': 'us-east-2'
-    }
+            }
         )
 
-    to_bucket = s3.Bucket(to_bucket_name)
-
-    for from_bucket_name in from_bucket_list_names:
-        from_bucket = s3.Bucket(from_bucket_name)
-
-        for file in from_bucket.objects.all():
-            copy_source = {
-                'Bucket': from_bucket,
-    'Key': file
-            }
-            to_bucket.copy(copy_source, file)
-
-    for bucket in s3.buckets.all():
-        print(bucket.name)
-
+    logfile = os.path.basename(logger.handlers[0].baseFilename)
+    s3.Bucket(bucket_name).upload_file(logfile, logfile)
 
 def main(argv):
     try:
         link=sys.argv[1]
     except IndexError:
-        logging.critical('parser.py <url>')
+        logger.critical('parser.py <url>')
         sys.exit(2)
 
     parse(link)
